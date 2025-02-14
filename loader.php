@@ -56,6 +56,8 @@ add_action( 'bp_include', 'bp_follow_init' );
  *
  * @return bool True if textdomain loaded; false if not.
  */
+ 
+ 
 function bp_follow_localization() {
 	$domain = 'buddypress-followers';
 	$mofile_custom = trailingslashit( WP_LANG_DIR ) . sprintf( '%s-%s.mo', $domain, get_locale() );
@@ -66,4 +68,13 @@ function bp_follow_localization() {
 		return load_plugin_textdomain( $domain, false, basename( BP_FOLLOW_DIR ) . '/languages/' );
 	}
 }
+/*
+in this for/pull request, we updated it to use init hook instead of:
+
 add_action( 'plugins_loaded', 'bp_follow_localization' );
+
+becase it caused:
+PHP Notice:  Function _load_textdomain_just_in_time was called <strong>incorrectly</strong>.
+
+*/
+add_action( 'init', 'bp_follow_localization' );
