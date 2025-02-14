@@ -25,8 +25,9 @@ defined( 'ABSPATH' ) || exit;
 function bp_follow_user_setup_nav( $main_nav = array(), $sub_nav = array() ) {
 	$bp = $GLOBALS['bp'];
 
-	// If using an older version of BP, check bp_use_admin_bar().
-	if ( defined( 'WP_NETWORK_ADMIN' ) && function_exists( 'bp_use_wp_admin_bar' ) && bp_use_wp_admin_bar() ) {
+	// If we're in the admin area and we're using the WP toolbar, we don't need
+	// to run the rest of this method.
+	if ( defined( 'WP_NETWORK_ADMIN' ) && bp_use_wp_admin_bar() ) {
 		return;
 	}
 
@@ -585,6 +586,11 @@ add_action( 'bp_members_directory_member_types', 'bp_follow_add_following_tab' )
  *
  * @param BP_User_Query $q
  */
+ /*
+ 
+/*
+
+overode this function: 
 function bp_follow_pre_user_query( $q ) {
 	if ( 'oldest-follows' !== $q->query_vars['type'] && 'newest-follows' !== $q->query_vars['type'] ) {
 		return;
@@ -607,7 +613,138 @@ function bp_follow_pre_user_query( $q ) {
 		$q->query_vars['user_ids'] = array_splice( $q->query_vars['user_ids'], $q->query_vars['per_page'] * ( $q->query_vars['page'] - 1 ), $q->query_vars['per_page'] );
 	}
 }
+add_action( 'bp_pre_user_query_construct', 'bp_follow_pre_user_query' );*/
+
+function bp_follow_pre_user_query( $q ) {
+
+    // Get the current BuddyPress component and action
+    $current_component = bp_current_component();
+    $current_action = bp_current_action();
+
+    // Capture the filter parameter from the AJAX request
+    $profile_user_id = bp_displayed_user_id();
+    $page = isset($_POST['page']) ? intval($_POST['page']) : 1;
+    $ajax_filter = isset($_POST['filter']) ? sanitize_text_field($_POST['filter']) : '';
+    
+    if(!$profile_user_id || !$ajax_filter || $page <1){
+        return;
+    }
+
+    // Determine whether to call the followers or following function based on the component and action
+    if ( $current_component === 'followers' && $current_action === 'followers' ) {
+        $user_ids = get_followers_for_profile_user($profile_user_id, $ajax_filter, $page);
+    } elseif ( $current_component === 'following' && $current_action === 'following' ) {
+        $user_ids = get_following_for_profile_user($profile_user_id, $ajax_filter, $page);
+    } else {
+        return; // Exit if not on a relevant tab
+    }
+
+    // Log the retrieved user IDs
+
+    if ( !empty($user_ids) && is_array($user_ids) ) {
+        // Update the query_vars to include the user IDs
+        $q->query_vars['include'] = $user_ids;
+        $q->query_vars['user_ids'] = $user_ids;
+
+        // Log the updated query vars
+    } else {
+        return; // Exit if no users are found
+    }
+
+    // Return the updated user query
+    return $q;
+}
 add_action( 'bp_pre_user_query_construct', 'bp_follow_pre_user_query' );
+
+function get_followers_for_profile_user($leader_id, $filter = 'newest-follows', $page = 1, $per_page = 10) {
+    global $wpdb;
+    $table_follow = $wpdb->prefix . 'bp_follow';
+    $table_users = $wpdb->prefix . 'users';
+    $table_usermeta = $wpdb->prefix . 'usermeta';
+    $offset = ($page - 1) * $per_page;
+
+    // Determine the order clause based on the filter
+    switch ($filter) {
+        case 'oldest-follows':
+            $order_by = "f.date_recorded DESC";
+            break;
+        case 'active':
+            $order_by = "um.meta_value ASC"; // last_activity from usermeta
+            break;
+        case 'newest':
+            $order_by = "u.user_registered ASC"; // newest registered
+            break;
+        case 'alphabetical':
+            $order_by = "u.display_name ASC"; // alphabetical order
+            break;
+        case 'newest-follows':
+        default:
+            $order_by = "f.date_recorded ASC"; // default to newest follows
+            break;
+    }
+
+    // Prepare query
+    $query = $wpdb->prepare(
+        "SELECT f.follower_id 
+        FROM $table_follow f
+        LEFT JOIN $table_users u ON f.follower_id = u.ID
+        LEFT JOIN $table_usermeta um ON f.follower_id = um.user_id AND um.meta_key = 'last_activity'
+        WHERE f.leader_id = %d 
+        ORDER BY $order_by 
+        LIMIT %d OFFSET %d",
+        $leader_id, $per_page, $offset
+    );
+
+    // Execute query
+    $results = $wpdb->get_col($query);
+
+    return $results;
+}
+
+function get_following_for_profile_user($follower_id, $filter = 'newest-follows', $page = 1, $per_page = 10) {
+    global $wpdb;
+    $table_follow = $wpdb->prefix . 'bp_follow';
+    $table_users = $wpdb->prefix . 'users';
+    $table_usermeta = $wpdb->prefix . 'usermeta';
+    $offset = ($page - 1) * $per_page;
+
+    // Determine the order clause based on the filter
+    switch ($filter) {
+        case 'oldest-follows':
+            $order_by = "f.date_recorded DESC";
+            break;
+        case 'active':
+            $order_by = "um.meta_value ASC"; // last_activity from usermeta
+            break;
+        case 'newest':
+            $order_by = "u.user_registered ASC"; // newest registered
+            break;
+        case 'alphabetical':
+            $order_by = "u.display_name ASC"; // alphabetical order
+            break;
+        case 'newest-follows':
+        default:
+            $order_by = "f.date_recorded ASC"; // default to newest follows
+            break;
+    }
+
+    // Prepare query
+    $query = $wpdb->prepare(
+        "SELECT f.leader_id 
+        FROM $table_follow f
+        LEFT JOIN $table_users u ON f.leader_id = u.ID
+        LEFT JOIN $table_usermeta um ON f.leader_id = um.user_id AND um.meta_key = 'last_activity'
+        WHERE f.follower_id = %d 
+        ORDER BY $order_by 
+        LIMIT %d OFFSET %d",
+        $follower_id, $per_page, $offset
+    );
+
+    // Execute query
+    $results = $wpdb->get_col($query);
+
+    return $results;
+}
 
 /** AJAX MANIPULATION ****************************************************/
 
