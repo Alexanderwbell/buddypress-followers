@@ -74,8 +74,6 @@ function bp_follow_screen_activity_following() {
  * @since 1.0
  */
 function bp_follow_load_template_filter( $found_template, $templates ) {
-    error_log('bp_follow_load_template_filter function called.');
-
     $bp = $GLOBALS['bp'];
 
     // Only filter the template location when we're on the follow component pages.
