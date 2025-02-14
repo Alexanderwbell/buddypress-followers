@@ -74,59 +74,46 @@ function bp_follow_screen_activity_following() {
  * @since 1.0
  */
 function bp_follow_load_template_filter( $found_template, $templates ) {
-	$bp = $GLOBALS['bp'];
+    error_log('bp_follow_load_template_filter function called.');
 
-	// Only filter the template location when we're on the follow component pages.
-	if ( ! bp_is_current_component( $bp->follow->followers->slug ) && ! bp_is_current_component( $bp->follow->following->slug ) )
-		return $found_template;
+    $bp = $GLOBALS['bp'];
 
-	// $found_template is not empty when the older template files are found in the
-	// parent and child theme
-	//
-	//  /wp-content/themes/YOUR-THEME/members/single/following.php
-	//  /wp-content/themes/YOUR-THEME/members/single/followers.php
-	//
-	// The older template files utilize a full template ( get_header() +
-	// get_footer() ), which sucks for themes and theme compat.
-	//
-	// When the older template files are not found, we use our new template method,
-	// which will act more like a template part.
-	if ( empty( $found_template ) ) {
-		// register our theme compat directory
-		//
-		// this tells BP to look for templates in our plugin directory last
-		// when the template isn't found in the parent / child theme.
-		bp_register_template_stack( 'bp_follow_get_template_directory', 14 );
+    // Only filter the template location when we're on the follow component pages.
+    if ( ! bp_is_current_component( $bp->follow->followers->slug ) && ! bp_is_current_component( $bp->follow->following->slug ) ) {
+        return $found_template;
+    }
+    // Log if a found template exists
+    if ( empty( $found_template ) ) {
 
-		// locate_template() will attempt to find the plugins.php template in the
-		// child and parent theme and return the located template when found
-		//
-		// plugins.php is the preferred template to use, since all we'd need to do is
-		// inject our content into BP
-		//
-		// note: this is only really relevant for bp-default themes as theme compat
-		// will kick in on its own when this template isn't found.
-		$found_template = locate_template( 'members/single/plugins.php', false, false );
+        // register our theme compat directory
+        bp_register_template_stack( 'bp_follow_get_template_directory', 14 );
 
-		// add AJAX support to the members loop
-		// can disable with the 'bp_follow_allow_ajax_on_follow_pages' filter.
-		if ( apply_filters( 'bp_follow_allow_ajax_on_follow_pages', true ) ) {
-			// add the "Order by" dropdown filter
-			add_action( 'bp_member_plugin_options_nav',    'bp_follow_add_members_dropdown_filter' );
+        // Attempt to locate the plugins.php template in the child and parent theme
+        $found_template = locate_template( 'members/single/plugins.php', false, false );
 
-			// add ability to use AJAX.
-			add_action( 'bp_after_member_plugin_template', 'bp_follow_add_ajax_to_members_loop' );
-		}
+        // Add AJAX support if allowed
+        if ( apply_filters( 'bp_follow_allow_ajax_on_follow_pages', true ) ) {
 
-		// add our hook to inject content into BP
-		//
-		// note the new template name for our template part.
-		add_action( 'bp_template_content', function() {
-			bp_get_template_part( 'members/single/follow' );
-		} );
-	}
+            // Add the "Order by" dropdown filter
+            add_action( 'bp_member_plugin_options_nav', 'bp_follow_add_members_dropdown_filter' );
 
-	return apply_filters( 'bp_follow_load_template_filter', $found_template );
+            // Add AJAX support to the members loop
+            add_action( 'bp_after_member_plugin_template', 'bp_follow_add_ajax_to_members_loop' );
+        } else {
+            error_log('AJAX support is disabled for follow pages.');
+        }
+
+        // Add the hook to inject content into BP
+        add_action( 'bp_template_content', function() {
+            bp_get_template_part( 'members/single/follow' );
+        });
+    } else {
+        error_log('Existing template found: ' . $found_template);
+    }
+
+    $final_template = apply_filters( 'bp_follow_load_template_filter', $found_template );
+
+    return $final_template;
 }
 add_filter( 'bp_located_template', 'bp_follow_load_template_filter', 10, 2 );
 
