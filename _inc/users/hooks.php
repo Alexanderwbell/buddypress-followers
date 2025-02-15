@@ -645,8 +645,6 @@ function bp_follow_pre_user_query( $q ) {
         // Update the query_vars to include the user IDs
         $q->query_vars['include'] = $user_ids;
         $q->query_vars['user_ids'] = $user_ids;
-
-        // Log the updated query vars
     } else {
         return; // Exit if no users are found
     }
@@ -675,7 +673,11 @@ function get_followers_for_profile_user($leader_id, $filter = 'newest-follows', 
             $order_by = "u.user_registered ASC"; // newest registered
             break;
         case 'alphabetical':
-            $order_by = "u.display_name ASC"; // alphabetical order
+            if ( bp_is_active( 'xprofile' ) ){
+                $order_by = "u.display_name ASC"; // alphabetical order
+            }else{
+                $order_by = "f.date_recorded ASC";
+            }
             break;
         case 'newest-follows':
         default:
@@ -720,7 +722,11 @@ function get_following_for_profile_user($follower_id, $filter = 'newest-follows'
             $order_by = "u.user_registered ASC"; // newest registered
             break;
         case 'alphabetical':
-            $order_by = "u.display_name ASC"; // alphabetical order
+            if ( bp_is_active( 'xprofile' ) ){
+                $order_by = "u.display_name ASC"; // alphabetical order
+            }else{
+                $order_by = "f.date_recorded ASC";
+            }
             break;
         case 'newest-follows':
         default:
