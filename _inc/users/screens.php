@@ -171,8 +171,8 @@ function bp_follow_add_ajax_to_members_loop() {
  * @see bp_follow_load_template_filter()
  */
 function bp_follow_add_members_dropdown_filter() {
-?>
 
+?>
 	<?php do_action( 'bp_members_directory_member_sub_types' ); ?>
 
 	<li id="members-order-select" class="last filter">
